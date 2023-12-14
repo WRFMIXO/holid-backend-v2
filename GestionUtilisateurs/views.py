@@ -2,6 +2,7 @@ from django.shortcuts import render
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView, TokenVerifyView
+from rest_framework.views import APIView
 from .models import CustomUser
 from .serializers import CustomUserSerializer, CreateUserSerializer
 from django.http import JsonResponse
@@ -48,16 +49,27 @@ class UserLoginView(TokenObtainPairView):
         
         if response.status_code == 200 and request.user.is_authenticated:
             user = self.request.user
-            serialized_user = CustomUserSerializer(user).data
 
-            columns = [{"field": key, "headerName": key.upper(), "width": 200} for key in serialized_user.keys()]
+             # met à jour la date de dernière connexion
+            user.last_login = timezone.now()
+            user.save()
+
+            # Active l'utilisateur sur la plateforme
+            user.is_active = True
+            user.save()
+
+            role = "super_admin" if user.is_superuser else "regular_user"
+            permissions = ["read", "write"]  # Vous devrez définir cela en fonction de votre logique d'autorisation
 
             data = {
-                "columns": columns,
-                "rows": [serialized_user]
+                "access": str(response.data["access"]),
+                "refresh": str(response.data["refresh"]),
+                "role": role,
+                "permissions": permissions,
+                # Ajoutez d'autres informations dont vous avez besoin ici
             }
 
-            return JsonResponse(data)
+            return Response(data, status=status.HTTP_200_OK)
 
         return response
 
@@ -83,3 +95,21 @@ class CreateUserView(generics.CreateAPIView):
         self.perform_create(serializer)
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+class ActiveUsers(generics.ListAPIView):
+    serializer_class = CustomUserSerializer
+
+    def get_queryset(self):
+        return CustomUser.objects.filter(is_active=True)
+    
+class InactiveUsers(generics.ListAPIView):
+    serializer_class = CustomUserSerializer
+
+    def get_queryset(self):
+        return CustomUser.objects.filter(is_active=False)
+
+class AllUsers(generics.ListAPIView):
+    serializer_class = CustomUserSerializer
+
+    def get_queryset(self):
+        return CustomUser.objects.all()

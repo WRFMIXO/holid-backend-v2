@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'GestionPermissions',
     'GestionServices',
     'GestionUtilisateurs',
+    'GestionHotel',
 ]
 
 MIDDLEWARE = [
